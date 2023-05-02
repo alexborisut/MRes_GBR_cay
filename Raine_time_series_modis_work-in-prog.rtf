@@ -1,0 +1,195 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2580
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 //Raine Time series; output not yet achieved \
+\
+\
+\
+// adding date of the image\
+//sentinel 2 imagery\
+var sentinel_2 = ee.ImageCollection("COPERNICUS/S2"),\
+  trueColour = \{"bands": ["B4", "B3", "B2"], "min": 0, "max": 3000\},\
+  local = ee.Geometry.Point([144.03512477052647,-11.590257766359628]),\
+  geometry = ee.Geometry.Polygon(\
+    [[[144.02963160646397,-11.594587881195766],\
+    [144.04091834199863,-11.594587881195766],\
+    [144.04091834199863,-11.586978605610462],\
+    [144.02963160646397,-11.586978605610462]]], null, false);\
+    \
+var start_date = '2019-01-01';\
+var end_date = '2019-12-31';\
+\
+var image = ee.Image(sentinel_2\
+  .filterDate(start_date, end_date)\
+  .filterBounds(local)\
+  .sort('CLOUD_COVER', true)\
+  .first());\
+print('All metadata:', image);  \
+print(image.id().getInfo());\
+  \
+var true_image = sentinel_2.median().clip(geometry);\
+Map.addLayer(true_image, trueColour, 'Clipped True Image');\
+\
+var palette = ['184DE5', '1866E5', '1888E5', '18A1E5', '18C3E5', '18D9E5',\
+              'F51693', 'F516B8', 'D316C2', 'C516D3', 'A516D3', 'B318E5',\
+              '18E5BA', '18E594', '18E56F', '18E54D', '7FE518'];\
+              \
+var mndwi = image.normalizedDifference(['B11', 'B3']);\
+\
+var clipped_mndwi = mndwi.clip(geometry);\
+\
+var clipped_image = image.clip(geometry);\
+var clipped_image_mndwi = clipped_image.normalizedDifference(['B11', 'B3']);\
+\
+Map.addLayer(clipped_image_mndwi, \{min:0, max:1, palette: palette\}, 'mndwi clipped image:');\
+Map.centerObject(local, 15);\
+\
+//converting to feature collection\
+var collection = clipped_mndwi.sample(\{\
+    region: geometry,\
+    geometries: true,\
+    //scale: 5\
+    scale: 10\
+\});\
+\
+\
+\
+var id = image.id().getInfo();\
+print('Image ID:', id);\
+\
+//var collection3 = ee.Feature(collection).set('Image_id', print(image.id().getInfo()));\
+//print('test', collection3.id);\
+\
+var collection2 = collection.map(function(ft)\{\
+  return ee.Feature(ft).set('Image_id', id)\
+\});\
+\
+//print(collection3)\
+\
+print('Pixel count:', collection.size());\
+\
+Export.table.toDrive(\{\
+  collection: collection2,\
+  folder: 'MNDWI',\
+  description: 'mndwi_pixel_count_Raine_20230416_trial_1',\
+  fileFormat: 'CSV',\
+  selectors: ['Image_id','nd']\
+\});\
+\
+//time series analysis trial 1 16/4/23\
+// code interpreted from https://spatialthoughts.com/2020/04/13/extracting-time-series-ee/\
+\
+\
+\
+//mndwi function band\
+function addMNDWI(image) \{\
+  var mndwi = image.normalizedDifference(['B11', 'B3']).rename('mndwi')\
+  return image.addBands([mndwi])\
+\};\
+\
+\
+\
+\
+var Raine_Sentinel = ee.ImageCollection("COPERNICUS/S2")\
+.filterDate(start_date, end_date)\
+.map(addMNDWI)\
+//.Filter('CLOUD_COVER', 20)\
+//.Filter\
+,\
+  trueColour = \{"bands": ["B4", "B3", "B2"], "min": 0, "max": 3000\},\
+  local = ee.Geometry.Point([144.03512477052647,-11.590257766359628]),\
+  geometry = ee.Geometry.Polygon(\
+    [[[144.02963160646397,-11.594587881195766],\
+    [144.04091834199863,-11.594587881195766],\
+    [144.04091834199863,-11.586978605610462],\
+    [144.02963160646397,-11.586978605610462]]], null, false)\
+    ;\
+    \
+//var Raine_Sentinel = Raine_Sentinel.select(mndwi);    \
+    \
+    //2000-2002 land-water mask for purpose of above source https://developers.google.com/earth-engine/datasets/catalog/MODIS_MOD44W_MOD44W_005_2000_02_24#bands\
+//0 = land, 1 = water\
+\
+//xhttps://developers.google.com/earth-engine/datasets/catalog/JRC_GSW1_4_GlobalSurfaceWater#bands \
+//more up to date\
+\
+var land_water_mask = ee.Image("MODIS/MOD44W/MOD44W_005_2000_02_24");\
+var water = land_water_mask.select('water_mask').eq(1);\
+var land = land_water_mask.select('water_mask').eq(0);\
+//we only want land stats, we will mask pixels that have a 1 value\
+var land_points = land_water_mask.select('water_mask').eq(0).stratifiedSample(\{numPoints:100, region:geometry, geometries: true\} )\
+// We need a unique id for each point. We take the feature id and set it as\
+// a property so we can refer to each point easily\
+var land_points = land_points.map(function(feature) \{\
+  return ee.Feature(feature.geometry(), \{'id': feature.id()\})\
+\});\
+    \
+\
+var true_colour_image = Raine_Sentinel.median().clip(geometry);\
+var  trueColour = \{"bands": ["B4", "B3", "B2"], "min": 0, "max": 3000\};   \
+Map.addLayer(true_colour_image, trueColour, 'Raine_Sentinel_true_colour');\
+\
+//time series test\
+var testpoint = ee.Feature(land_points.first());\
+\
+var mndwi_Raine = true_colour_image.select('mndwi');\
+\
+var testPoint = ee.Feature(land_points.first())\
+//Map.centerObject(testPoint, 10)\
+var chart = ui.Chart.image.series(\{\
+    imageCollection: true_colour_image.select('mndwi'),\
+    region: testPoint.geometry()\
+    \}).setOptions(\{\
+      interpolateNulls: true,\
+      lineWidth: 1,\
+      pointSize: 3,\
+      title: 'MNDWI over Time at a Single Location',\
+      vAxis: \{title: 'MNDWI'\},\
+      hAxis: \{title: 'Date', format: 'YYYY-MMM', gridlines: \{count: 12\}\}\
+    \})\
+print(chart);\
+\
+var chart = ui.Chart.image.series(\
+    mndwi_Raine//true_colour_image.select('mndwi')\
+    ,geometry\
+    ,ee.Reducer.mean(), \
+  10)\
+  //.setOptions(\{\
+  //    interpolateNulls: true,\
+  //    lineWidth: 1,\
+  //    pointSize: 3,\
+  //    title: 'MNDWI over Time at Raine Island',\
+  //    vAxis: \{title: 'MNDWI'\},\
+  //    hAxis: \{title: 'Date', format: 'YYYY-MMM', gridlines: \{count: 12\}\}\
+  //  \});\
+;\
+\
+    //.ee.projection.crs('EPSG:4326'),\
+   // ,region: Point1.geometry()\
+    \
+// .ee.Reducer.mean(),1000)\
+print(chart);\
+\
+\
+\
+//var chart = ui.Chart.image.series(\{\
+//    imageCollection: true_colour_image.select('mndwi')\
+//    //.ee.projection.crs('EPSG:4326'),\
+//    ,region: Point1.geometry()\
+//    \
+//\} .ee.Reducer.mean(),1000)\
+//    //.projection.crs('EPSG:4326')\
+//    .setOptions(\{\
+//      interpolateNulls: true,\
+//      lineWidth: 1,\
+//      pointSize: 3,\
+//      title: 'MNDWI over Time at Raine Island',\
+//      vAxis: \{title: 'MNDWI'\},\
+//      hAxis: \{title: 'Date', format: 'YYYY-MMM', gridlines: \{count: 12\}\}\
+//    \});\
+//print(chart);\
+}
