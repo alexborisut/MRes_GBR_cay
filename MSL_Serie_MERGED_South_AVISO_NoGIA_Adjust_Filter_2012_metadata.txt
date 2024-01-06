@@ -1,0 +1,28 @@
+File MSL_Serie_MERGED_South_AVISO_NoGIA_Adjust_Filter_2012.nc (NC_FORMAT_CLASSIC):
+
+     3 variables (excluding dimension variables):
+        double msl[time]   
+            _FillValue: 18446744073709551616
+            long_name: mean sea level (satellite=Gridded Regional, zone=South) (sinusoids removed)
+            standard_name: sea_surface_height_above_sea_level
+            units: m
+        short cycle[time]   
+            _FillValue: 32767
+            long_name: cycle number
+        short pass[time]   
+            long_name: pass number
+            _FillValue: 32767
+
+     1 dimensions:
+        time  Size:1544 
+            standard_name: time
+            axis: T
+            units: days since 1950-01-01
+
+    6 global attributes:
+        institution: CLS
+        history: 2023-10-20 22:56:04 : created by aviso@altimetry.fr
+        cls_default_ordinate: msl
+        Conventions: CF-1.6
+        title: mean sea level
+        references: http://www.aviso.altimetry.fr
